@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Hesap Et POS" />
+    <title>Hesap Et POS</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/logo.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-overlay"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <img src="./assets/logo.png" alt="Hesap Et Logo" class="brand-logo" />
+        <div>
+          <h1>Hesap Et POS</h1>
+          <p>Şarküteri & Kasap Yönetimi</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div id="clock"></div>
+        <div class="role-badge">Rol: <strong id="activeRole">Kasiyer</strong></div>
+        <button id="logoutBtn" class="secondary" type="button">Çıkış</button>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="satis">Satış</button>
+        <button class="tab-btn" data-tab="urunler">Ürünler</button>
+        <button class="tab-btn" data-tab="stok">Stok</button>
+        <button class="tab-btn" data-tab="giderler">Giderler</button>
+        <button class="tab-btn" data-tab="gunsonu">Gün Sonu</button>
+        <button class="tab-btn" data-tab="raporlar">Raporlar</button>
+        <button class="tab-btn" data-tab="fis">Fişler</button>
+        <button class="tab-btn" data-tab="ayarlar">Ayarlar</button>
+      </nav>
+
+      <main>
+      <section id="tab-satis" class="tab-panel active">
+        <div class="grid two-col">
+          <div class="card">
+            <h2>Ürün Arama</h2>
+            <div class="speed-tools">
+              <button id="barcodeModeToggle" class="secondary" type="button" aria-pressed="false">Barkod Modu: Kapalı</button>
+              <button id="quickAddBtn" type="button">İlk Sonucu Hızlı Ekle (F4)</button>
+              <span id="barcodeModeStatus" class="note">Standart arama modu</span>
+            </div>
+            <p id="shortcutHints" class="note">Kısayollar: F2 arama • F4 hızlı ekle • F8 satışı tamamla • Ctrl+B barkod modu</p>
+            <input id="searchInput" type="text" placeholder="Ürün adı veya barkod..." autocomplete="off" />
+            <div id="productList" class="list"></div>
+          </div>
+
+          <div class="card">
+            <h2>Sepet</h2>
+            <div id="cartList" class="list"></div>
+            <div class="summary">
+              <div>Ara Toplam: <strong id="subtotal">0.00 ₺</strong></div>
+              <div>Genel Toplam: <strong id="grandTotal">0.00 ₺</strong></div>
+            </div>
+            <div class="pay-row">
+              <select id="paymentMethod">
+                <option value="nakit">Nakit</option>
+                <option value="kart">POS (Kart)</option>
+              </select>
+              <button id="completeSaleBtn">Satışı Tamamla</button>
+            </div>
+            <div id="cashFields" class="cash-fields">
+              <label for="cashReceived">Alınan Nakit (₺)</label>
+              <input id="cashReceived" type="number" min="0" step="0.01" placeholder="0.00" />
+              <div class="cash-change">Para Üstü: <strong id="cashChange">0.00 ₺</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Son Fişler / İade</h2>
+          <p class="note">İade işlemlerinde stok otomatik geri alınır.</p>
+          <div id="recentSalesList" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-urunler" class="tab-panel">
+        <div class="card">
+          <h2>Yeni Ürün Tanımı (Sadece Yönetici)</h2>
+          <form id="productForm" class="form-grid">
+            <input name="name" placeholder="Ürün adı" required />
+            <input name="barcode" placeholder="Barkod (opsiyonel)" />
+            <select name="unit" required>
+              <option value="adet">Adet</option>
+              <option value="kg">Kg</option>
+            </select>
+            <input name="buyPrice" type="number" step="0.01" min="0" placeholder="Varsayılan alış fiyatı" required />
+            <input name="sellPrice" type="number" step="0.01" min="0" placeholder="Satış fiyatı" required />
+            <input name="criticalStock" type="number" step="0.001" min="0" placeholder="Kritik stok" required />
+            <button type="submit">Ürün Tanımı Kaydet</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Ürün Kataloğu</h2>
+          <div id="inventoryList" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-stok" class="tab-panel">
+        <div class="grid two-col">
+          <div class="card">
+            <h2>1) Stok Giriş Planı Oluştur</h2>
+            <p class="note">Önce hangi ürünün geleceği kayda alınır.</p>
+            <form id="intakePlanForm" class="form-grid two-row">
+              <select name="productId" id="intakeProductSelect" required></select>
+              <input name="supplier" placeholder="Tedarikçi (opsiyonel)" />
+              <input name="expectedQty" type="number" min="0" step="0.001" placeholder="Beklenen miktar" />
+              <input name="note" placeholder="Not" />
+              <button type="submit">Plan Kaydet</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2>2) Teslim Al ve Stoğa İşle (Yönetici)</h2>
+            <p class="note">Plan seçilir, gelen miktar ve birim maliyet girilerek stok artırılır.</p>
+            <div id="pendingIntakeList" class="list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Stok Hareketleri</h2>
+          <div id="stockMoves" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-fis" class="tab-panel">
+        <div class="card">
+          <h2>Tarih Aralığında Fiş Dökümü</h2>
+          <div class="filter-row">
+            <label>Başlangıç <input id="receiptFrom" type="date" /></label>
+            <label>Bitiş <input id="receiptTo" type="date" /></label>
+            <button id="filterReceiptsBtn">Listele</button>
+            <button id="printReceiptsBtn" class="secondary">Yazdır</button>
+            <button id="exportReceiptsBtn" class="secondary">CSV İndir</button>
+          </div>
+          <div id="receiptSummary" class="summary inline"></div>
+          <div id="receiptDumpList" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-raporlar" class="tab-panel">
+        <div class="card">
+          <h3>Aylık Arşiv Görünümü</h3>
+          <div class="filter-row">
+            <label>Ay Seçimi <select id="reportMonthSelect"></select></label>
+            <button id="clearReportMonthBtn" class="secondary" type="button">Canlı Döneme Dön</button>
+          </div>
+          <p class="note">Veriler silinmez. Seçtiğiniz aya göre o ayın gün sonu/gider raporu gösterilir.</p>
+          <div id="selectedMonthReport" class="summary"></div>
+        </div>
+        <div class="grid three-col">
+          <div class="card"><h3>Gün Sonu</h3><div id="dailyReport"></div></div>
+          <div class="card"><h3>Haftalık</h3><div id="weeklyReport"></div></div>
+          <div class="card"><h3>Aylık</h3><div id="monthlyReport"></div></div>
+        </div>
+        <div class="card">
+          <h3>Stok Kalan</h3>
+          <div id="stockReport" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-gunsonu" class="tab-panel">
+        <div class="grid two-col">
+          <div class="card">
+            <h2>Gün Sonu Girişi (Elle)</h2>
+            <p class="note">Satış sekmesi kullanılmadan gün sonu nakit/kart toplamı manuel girilebilir.</p>
+            <form id="endOfDayForm" class="form-grid two-row">
+              <label>Tarih <input name="date" type="date" required /></label>
+              <label>Nakit (₺) <input name="cash" type="number" min="0" step="0.01" required /></label>
+              <label>Kart (₺) <input name="card" type="number" min="0" step="0.01" required /></label>
+              <input name="note" placeholder="Not (opsiyonel)" />
+              <button type="submit">Gün Sonu Kaydet</button>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Gün Sonu Kayıtları</h2>
+            <p class="note">Her kayıt için düzenle/sil işlemi yapılabilir.</p>
+            <div id="endOfDayList" class="list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-giderler" class="tab-panel">
+        <div class="grid two-col">
+          <div class="card">
+            <h2>Gider Ekle</h2>
+            <form id="expenseForm" class="form-grid two-row">
+              <label>Tarih <input name="date" type="date" required /></label>
+              <label>Tutar (₺) <input name="amount" type="number" min="0.01" step="0.01" required /></label>
+              <input name="category" placeholder="Kategori (örn: kira, personel, elektrik)" />
+              <input name="note" placeholder="Not (opsiyonel)" />
+              <button type="submit">Gider Kaydet</button>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Gider Kayıtları</h2>
+            <div class="pay-row">
+              <label>Ay Filtresi
+                <select id="expenseMonthFilter"></select>
+              </label>
+              <button id="clearExpenseMonthFilterBtn" class="secondary" type="button">Filtreyi Temizle</button>
+            </div>
+            <div id="expenseMonthSummary" class="summary"></div>
+            <div id="expenseList" class="list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-ayarlar" class="tab-panel">
+        <div class="card">
+          <h2>Oturum</h2>
+          <p class="note">Uygulama giriş ekranı olmadan kullanılamaz. Yönetici: kullanıcı adı <strong>admin</strong>, şifre <strong>admin</strong>.</p>
+        </div>
+
+        <div class="card">
+          <h2>Bulut Yedekleme (Supabase REST)</h2>
+          <form id="cloudBackupForm" class="form-grid two-row">
+            <input id="cloudUrl" name="cloudUrl" placeholder="https://xxxx.supabase.co" />
+            <input id="cloudKey" name="cloudKey" placeholder="Supabase anon/service key" />
+            <input id="cloudStoreId" name="cloudStoreId" placeholder="Mağaza/Kasa Kimliği (örn: sube-1)" />
+            <button id="saveCloudConfigBtn" type="submit">Bulut Ayarını Kaydet</button>
+          </form>
+          <div class="pay-row">
+            <button id="backupNowBtn" type="button">Şimdi Buluta Yedekle</button>
+            <button id="restoreNowBtn" class="secondary" type="button">Buluttan Geri Yükle</button>
+          </div>
+          <div class="pay-row">
+            <label><input id="autoSyncEnabled" type="checkbox" /> Otomatik Senkron Aktif</label>
+            <label>Senkron Aralığı (sn)
+              <input id="autoSyncIntervalSec" type="number" min="10" step="1" value="30" />
+            </label>
+            <button id="applyAutoSyncBtn" class="secondary" type="button">Senkron Ayarını Uygula</button>
+          </div>
+          <div id="cloudBackupStatus" class="summary"></div>
+        </div>
+      </section>
+      </main>
+    </div>
+
+    <div id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <h2>Hesap Et POS Giriş</h2>
+        <p class="note">Yönetici girişi: admin / admin</p>
+        <form id="adminLoginForm" class="form-grid two-row">
+          <input id="adminUsername" name="username" placeholder="Kullanıcı adı" autocomplete="username" />
+          <input id="adminPassword" name="password" type="password" placeholder="Şifre" autocomplete="current-password" />
+          <button type="submit">Yönetici Giriş</button>
+        </form>
+        <div class="pay-row">
+          <button id="cashierLoginBtn" class="secondary" type="button">Kasiyer Olarak Giriş</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="./app.js"></script>
+    <script>
+      (function registerPwaWorker() {
+        const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+        if (!isHttp || !('serviceWorker' in navigator)) return;
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {
+            // Web/PWA desteği opsiyoneldir; kayıt hatası uygulamayı etkilemez.
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
