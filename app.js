@@ -145,7 +145,6 @@ init();
 
 function init() {
   ensureAuthState();
-  forceLogoutOnStartup();
   bindTabs();
   bindEvents();
   bindAuthEvents();
@@ -1869,7 +1868,11 @@ async function pullLatestFromCloud(silent = true, force = false) {
     };
     const preservedActiveRole = state.activeRole === 'yonetici' ? 'yonetici' : 'kasiyer';
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(first.payload));
+    const restoredPayload = structuredClone(first.payload);
+    delete restoredPayload.auth;
+    delete restoredPayload.activeRole;
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(restoredPayload));
     state = loadState();
     state.cloudBackup = {
       ...state.cloudBackup,
