@@ -1862,12 +1862,24 @@ async function pullLatestFromCloud(silent = true, force = false) {
       lastRemoteUpdatedAt: remoteUpdatedAt || new Date().toISOString()
     };
 
+    const preservedAuth = {
+      isLoggedIn: Boolean(state.auth?.isLoggedIn),
+      role: state.auth?.role === 'yonetici' ? 'yonetici' : 'kasiyer',
+      username: String(state.auth?.username || (state.auth?.role === 'yonetici' ? 'admin' : 'Kasiyer'))
+    };
+    const preservedActiveRole = state.activeRole === 'yonetici' ? 'yonetici' : 'kasiyer';
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(first.payload));
     state = loadState();
     state.cloudBackup = {
       ...state.cloudBackup,
       ...preservedCloud
     };
+    state.auth = {
+      ...state.auth,
+      ...preservedAuth
+    };
+    state.activeRole = preservedActiveRole;
     ensureAuthState();
 
     suppressAutoPush = true;
