@@ -1688,23 +1688,37 @@ function renderCloudBackupStatus() {
   `;
 }
 
-function onSubmitCloudBackupConfig(e) {
+async function onSubmitCloudBackupConfig(e) {
   e.preventDefault();
 
   state.cloudBackup.url = String(el.cloudUrl?.value || '').trim().replace(/\/$/, '');
   state.cloudBackup.key = String(el.cloudKey?.value || '').trim();
   state.cloudBackup.storeId = String(el.cloudStoreId?.value || '').trim();
 
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
+
   renderCloudBackupStatus();
   restartAutoSyncLoop();
+
+  const pulled = await pullLatestFromCloud(true, true);
+  if (pulled) {
+    notify('Bulut ayarları kaydedildi. Buluttaki son veri cihaza alındı.');
+    return;
+  }
+
   notify('Bulut ayarları kaydedildi.');
 }
 
 function applyAutoSyncSettings() {
   state.cloudBackup.autoSyncEnabled = Boolean(el.autoSyncEnabled?.checked);
   state.cloudBackup.autoSyncIntervalSec = Math.max(10, Number(el.autoSyncIntervalSec?.value || 30));
+
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
+
   renderCloudBackupStatus();
   restartAutoSyncLoop();
   notify('Otomatik senkron ayarları güncellendi.');
@@ -1811,11 +1825,23 @@ async function pullLatestFromCloud(silent = true, force = false) {
       headers: cloudHeaders()
     });
 
-    if (!res.ok) return false;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      if (!silent) notify(`Bulut okuma hatası: ${errText || `HTTP ${res.status}`}`);
+      return false;
+    }
 
     const rows = await res.json();
     const first = Array.isArray(rows) ? rows[0] : null;
-    if (!first || !first.payload || typeof first.payload !== 'object') return false;
+    if (!first) {
+      if (!silent) notify('Bulutta bu Store ID için kayıt bulunamadı.');
+      return false;
+    }
+
+    if (!first.payload || typeof first.payload !== 'object') {
+      if (!silent) notify('Bulut kaydı bulundu ama payload biçimi geçersiz.');
+      return false;
+    }
 
     const remoteUpdatedAt = String(first.updated_at || '');
     const localRemoteRef = String(state.cloudBackup.lastRemoteUpdatedAt || '');
@@ -1852,7 +1878,8 @@ async function pullLatestFromCloud(silent = true, force = false) {
     renderAll();
     if (!silent) notify('Buluttan en güncel veri alındı.');
     return true;
-  } catch {
+  } catch (err) {
+    if (!silent) notify(`Bulut okuma hatası: ${String(err.message || err)}`);
     return false;
   }
 }
@@ -1866,12 +1893,10 @@ async function restoreFromCloud() {
   const ok = confirm('Buluttan geri yükleme mevcut yerel verileri değiştirecek. Devam edilsin mi?');
   if (!ok) return;
 
-  const endpoint = `${state.cloudBackup.url}/rest/v1/pos_backups?store_id=eq.${encodeURIComponent(state.cloudBackup.storeId)}&select=payload,updated_at&limit=1`;
-
   try {
     const changed = await pullLatestFromCloud(false, true);
     if (!changed) {
-      notify('Bulutta geri yüklenecek daha yeni kayıt bulunamadı.');
+      notify('Buluttan geri yükleme yapılamadı. Store ID / API Key / RLS izinlerini kontrol edin.');
     }
   } catch (err) {
     notify(`Geri yükleme hatası: ${String(err.message || err)}`);
@@ -1989,7 +2014,10 @@ function onAdminLogin(e) {
   state.auth.role = 'yonetici';
   state.auth.username = 'admin';
   state.activeRole = 'yonetici';
+
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
 
   if (el.adminLoginForm) el.adminLoginForm.reset();
   renderAll();
@@ -2001,7 +2029,11 @@ function loginAsCashier() {
   state.auth.role = 'kasiyer';
   state.auth.username = 'Kasiyer';
   state.activeRole = 'kasiyer';
+
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
+
   renderAll();
   notify('Kasiyer olarak giriş yapıldı.');
 }
@@ -2011,7 +2043,11 @@ function logout() {
   state.auth.role = 'kasiyer';
   state.auth.username = 'Kasiyer';
   state.activeRole = 'kasiyer';
+
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
+
   renderAll();
   notify('Oturum kapatıldı.');
 }
@@ -2021,7 +2057,10 @@ function forceLogoutOnStartup() {
   state.auth.role = 'kasiyer';
   state.auth.username = 'Kasiyer';
   state.activeRole = 'kasiyer';
+
+  suppressAutoPush = true;
   saveState();
+  suppressAutoPush = false;
 }
 
 function ensureAuthState() {
