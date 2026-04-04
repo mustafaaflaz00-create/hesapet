@@ -1761,11 +1761,12 @@ async function backupToCloud(options = {}) {
   }
 
   const endpoint = `${state.cloudBackup.url}/rest/v1/pos_backups?on_conflict=store_id`;
+  const nowIso = new Date().toISOString();
   const body = [
     {
       store_id: state.cloudBackup.storeId,
       payload: backupPayload(),
-      updated_at: new Date().toISOString()
+      updated_at: nowIso
     }
   ];
 
@@ -1784,9 +1785,11 @@ async function backupToCloud(options = {}) {
       throw new Error(errText || `HTTP ${res.status}`);
     }
 
-    const nowIso = new Date().toISOString();
+    const rows = await res.json().catch(() => []);
+    const remoteUpdatedAt = String((Array.isArray(rows) && rows[0]?.updated_at) || nowIso);
+
     state.cloudBackup.lastBackupAt = nowIso;
-    state.cloudBackup.lastRemoteUpdatedAt = nowIso;
+    state.cloudBackup.lastRemoteUpdatedAt = remoteUpdatedAt;
     saveState();
     renderCloudBackupStatus();
     if (!silent) notify('Bulut yedekleme tamamlandı.');
@@ -1797,10 +1800,10 @@ async function backupToCloud(options = {}) {
   }
 }
 
-async function pullLatestFromCloud(silent = true) {
+async function pullLatestFromCloud(silent = true, force = false) {
   if (!hasValidCloudConfig()) return false;
 
-  const endpoint = `${state.cloudBackup.url}/rest/v1/pos_backups?store_id=eq.${encodeURIComponent(state.cloudBackup.storeId)}&select=payload,updated_at&limit=1`;
+  const endpoint = `${state.cloudBackup.url}/rest/v1/pos_backups?store_id=eq.${encodeURIComponent(state.cloudBackup.storeId)}&select=payload,updated_at&order=updated_at.desc.nullslast&limit=1`;
 
   try {
     const res = await fetch(endpoint, {
@@ -1816,7 +1819,9 @@ async function pullLatestFromCloud(silent = true) {
 
     const remoteUpdatedAt = String(first.updated_at || '');
     const localRemoteRef = String(state.cloudBackup.lastRemoteUpdatedAt || '');
-    if (remoteUpdatedAt && localRemoteRef && new Date(remoteUpdatedAt).getTime() <= new Date(localRemoteRef).getTime()) {
+    const remoteMs = Date.parse(remoteUpdatedAt);
+    const localMs = Date.parse(localRemoteRef);
+    if (!force && !Number.isNaN(remoteMs) && !Number.isNaN(localMs) && remoteMs <= localMs) {
       return false;
     }
 
@@ -1864,7 +1869,7 @@ async function restoreFromCloud() {
   const endpoint = `${state.cloudBackup.url}/rest/v1/pos_backups?store_id=eq.${encodeURIComponent(state.cloudBackup.storeId)}&select=payload,updated_at&limit=1`;
 
   try {
-    const changed = await pullLatestFromCloud(false);
+    const changed = await pullLatestFromCloud(false, true);
     if (!changed) {
       notify('Bulutta geri yüklenecek daha yeni kayıt bulunamadı.');
     }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hesap-et-pos-pwa-v1';
+const CACHE_NAME = 'hesap-et-pos-pwa-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,6 +24,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+
+  // Supabase gibi cross-origin API isteklerini cache'e sokma.
+  // Aksi halde eski JSON response'lar dönüp senkron bozuluyor.
+  if (!isSameOrigin) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
